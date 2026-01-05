@@ -1,0 +1,214 @@
+sudo -i
+yum install wget ntp nano firewalld tar -y
+sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
+sudo sysctl -p
+su -c 'cat >>/etc/sysctl.conf <<EOL
+net.ipv6.conf.all.disable_ipv6 =1
+net.ipv6.conf.default.disable_ipv6 =1
+net.ipv6.conf.lo.disable_ipv6 =1
+EOL'
+iptables -L -n -v 
+iptables-save > firewall.rules 
+systemctl disable firewalld
+sed -i '/exit 0/d' /etc/rc.local
+su -c 'cat >>/etc/rc.local <<EOL
+if test -f /sys/kernel/mm/redhat_transparent_hugepage/defrag/enabled; then
+  echo never > /sys/kernel/mm/redhat_transparent_hugepage/defrag/enabled
+fi
+if test -f /sys/kernel/mm/redhat_transparent_hugepage/defrag; then
+   echo never > /sys/kernel/mm/redhat_transparent_hugepage/defrag 
+fi
+exit 0
+EOL'
+source /etc/rc.local
+sudo -i
+echo "vm.swappiness = 10" >> /etc/sysctl.conf
+sudo sysctl -p
+mv /etc/localtime /etc/localtime.back
+ln -s /usr/share/zoneinfo/Asia/Kolkata /etc/localtime
+service ntpd start
+chkconfig ntpd on
+ntpstat
+ntpq -p
+date
+ulimit -n 100000
+
+cd .ssh/
+ssh-keygen
+
+
+
+cat id_rsa.pub >> authorized_keys
+cd
+
+sudo file -s /dev/nvme1n1
+sudo mkfs -t ext4 /dev/nvme1n1
+umount /data1
+sudo mkdir /data
+sudo mount /dev/nvme1n1 /data
+tune2fs -m 0 /dev/nvme1n1
+lsblk
+df -h
+
+nano /etc/fstab
+UUID=43b2bdb3-2077-421b-976e-56a368f0afdd       /data          ext4    defaults        1 1
+or
+/dev/nvme1n1       /data          ext4    defaults        1 1
+
+sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config && cat /etc/ssh/sshd_config | grep PasswordAuthentication;
+sudo yum-config-manager --enable rhui-REGION-rhel-server-optional
+sudo yum install libtirpc-devel -y
+sudo sed -i 's/^verify.*/verify=disable/' /etc/python/cert-verification.cfg
+
+sudo nano /etc/ssh/ssh_config
+#uncomment StrictKeyHostChecking and replace ask with no
+sudo service sshd restart	
+ssh localhost
+
+wget http://dev.mysql.com/get/mysql57-community-release-el7-7.noarch.rpm
+yum localinstall mysql57-community-release-el7-7.noarch.rpm -y
+yum repolist enabled | grep "mysql.*-community.*"
+yum install mysql-community-server -y
+service mysqld start
+mysql --version
+grep 'temporary password' /var/log/mysqld.log
+mysql_secure_installation
+
+Set Password = Admin-123
+mysql -u root -p
+
+create database ambari;
+grant all privileges on ambari.* to 'ambari'@'%' identified by 'Bigdata-123';
+grant all privileges on ambari.* to 'ambari'@'localhost' identified by 'Bigdata-123';
+grant all privileges on ambari.* to 'ambari'@'ip-172-31-82-209.ap-south-1.compute.internal' identified by 'Bigdata-123';
+
+create database hive DEFAULT CHARACTER SET utf8;
+grant all on hive.* TO 'hive'@'%' IDENTIFIED BY 'Hive-123';
+
+create database oozie DEFAULT CHARACTER SET utf8;
+grant all on oozie.* TO 'oozie'@'%' IDENTIFIED BY 'Oozie-123';
+
+create database hue DEFAULT CHARACTER SET utf8;
+grant all on hue.* TO 'hue'@'%' IDENTIFIED BY 'Hue-12345';
+
+
+FLUSH PRIVILEGES;
+exit;
+
+
+#Install the MySQL connector .jar file: on all host
+yum install mysql-connector-java* -y
+
+
+# Downloading Ambari Repository
+wget -nv http://public-repo-1.hortonworks.com/ambari/centos7/2.x/updates/2.6.2.2/ambari.repo -O /etc/yum.repos.d/ambari.repo
+
+yum repolist
+
+#Install the EPEL repo.
+
+yum install epel-release
+
+#Install the Ambari Agent
+
+yum install ambari-agent
+
+#Configure the Ambari Agent by editing the ambari-agent.ini file.
+
+vi  /etc/ambari-agent/conf/ambari-agent.ini
+                                    
+[server]
+hostname={your.ambari.server.hostname}
+url_port=8440
+secured_url_port=8441
+
+#Start the agent. The agent registers with the Server on start.
+
+ambari-agent start
+
+yum install ambari-server -y
+
+ambari-server setup
+
+#select 3 for advance DB -mysql
+
+#copy schema by command
+cp /var/lib/ambari-server/resources/Ambari-DDL-MySQL-CREATE.sql ~/myschema.sql
+
+mysql -u root -p ambari < ~/myschema.sql
+
+find / -name mysql-connector-java.jar
+ambari-server setup --jdbc-db=mysql --jdbc-driver=/usr/share/java/mysql-connector-java.jar
+
+ambari-server start
+
+
+username/password =admin
+enter cluster name = Prod_Pandora
+select stack version
+enter hostname
+If Error comes := Disable SSL certificate validation.
+sudo sed -i 's/^verify.*/verify=disable/' /etc/python/cert-verification.cfg
+nano /etc/ambari-agent/conf/ambari-agent.ini on all nodes in the [security] section of the file:
+force_https_protocol=PROTOCOL_TLSv1_2
+
+Set Java Home
+sudo nano /etc/profile
+export JAVA_HOME=/usr/jdk64/jdk1.8.0_112/
+export PATH=$PATH:$JAVA_HOME/bin
+source /etc/profile
+
+DO High Availibilty of Namenode and Resource Manager
+
+
+Ranger Configuration
+For Ranger Database creation
+mysql -u root -p
+create database ranger DEFAULT CHARACTER SET utf8;
+grant all on ranger.* TO 'ranger'@'%' IDENTIFIED BY 'Ranger-123';
+
+create database rangerkms DEFAULT CHARACTER SET utf8;
+grant all on rangerkms.* TO 'rangerkms'@'%' IDENTIFIED BY 'Rangerkms-123';
+
+CREATE USER 'rangerdba'@'localhost' IDENTIFIED BY 'Rangerdba-123';
+GRANT ALL PRIVILEGES ON *.* TO 'rangerdba'@'localhost';
+GRANT ALL PRIVILEGES ON *.* TO 'rangerdba'@'ip-172-32-31-19.ap-south-1.compute.internal';
+CREATE USER 'rangerdba'@'%' IDENTIFIED BY 'Rangerdba-123';
+GRANT ALL PRIVILEGES ON *.* TO 'rangerdba'@'%';
+GRANT ALL PRIVILEGES ON *.* TO 'rangerdba'@'localhost' WITH GRANT OPTION;
+GRANT ALL PRIVILEGES ON *.* TO 'rangerdba'@'%' WITH GRANT OPTION;
+GRANT ALL PRIVILEGES ON *.* TO 'rangerdba'@'ip-172-32-31-19.ap-south-1.compute.internal' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+exit;
+
+try to coonect with 
+mysql -u rangerdba -p Rangerdba-123
+exit;
+
+mysql -u ranger -p Ranger-123
+exit;
+
+Add Ranger service from ambari
+
+Ranger DB Name = ranger
+password = ranger-123
+
+Database administrator username = rangerdba
+password = rangerdba-123
+
+Test connection need to be ok
+
+Ranger Audit  - Solr should be OFF
+
+Save and go forward.
+
+Go to Configs - Ranger Plugin
+HDFS, YARN, HIVE, HBASE plugin - ON
+
+Save and Restart required services.
+
+for manually starting ranger services
+
+/usr/bin/ranger-admin start
+/usr/bin/ranger-usersync start
+/usr/bin/ranger-tagsync start

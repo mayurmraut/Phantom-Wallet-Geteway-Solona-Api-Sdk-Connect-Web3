@@ -1,0 +1,37 @@
+PROBLEM:
+Need to backup all databases in Mysql DB daily. 
+
+RESOLUTION:
+MySQL Database Dumps are a very basic task every administrator does, no matter how simple it sounds, it is most useful in failure scenarios. 
+1.) Create a .sh file with these entries, 
+>vi /usr/local/bin/mysql_backup.sh 
+#!/bin/bash 
+DB_BACKUP="/backups/mysql_backup/`date +%Y-%m-%d`" 
+DB_USER="root" 
+DB_PASSWD="secretttt" 
+HN=`hostname | awk -F. '{print $1}'` 
+
+2.) Create the backup directory 
+mkdir -p $DB_BACKUP 
+
+3.) Remove backups older than 10 days 
+find /backups/mysql_backup/ -maxdepth 1 -type d -mtime +10 -exec rm -rf {} \; 
+
+4.) Perform Backups
+Option 1: Backup each database on the system using a root username and password 
+for db in $(mysql --user=$DB_USER --password=$DB_PASSWD -e 'show databases' -s --skip-column-names|grep -vi information_schema); 
+do mysqldump --user=$DB_USER --password=$DB_PASSWD --opt $db | gzip > "$DB_BACKUP/mysqldump-$HN-$db-$(date +%Y-%m-%d).gz"; 
+done 
+
+Option 2: If you aren't using a root password then comment out option 1 and use this 
+# for db in $(mysql -e 'show databases' -s --skip-column-names|grep -vi information_schema); 
+# do mysqldump --opt $db | gzip > "$DB_BACKUP/mysqldump-$HN-$db-$(date +%Y-%m-%d).gz"; 
+# done 
+
+5.) Change permissoin on this file to 700 and add entry in cron 
+
+#crontab -e 
+30 01 * * * /usr/local/bin/mysql_backup.sh 2>&1>>/usr/local/bin/mysql_backup.log 
+
+The above will dump the database every day at 01:30 AM. 
+You can schedule it your way.
